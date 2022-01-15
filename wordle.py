@@ -72,7 +72,8 @@ def handle_guess_lists(valid_guesses: List[str], possible_answers: List[str]):
 def get_input() -> str:
     return input(f'Enter a guess:').strip()
 
-def main(num_digits: int, num_guesses: int, handle_guess_lists=handle_guess_lists, get_input=get_input, handle_result=None):
+def main(num_digits: int, num_guesses: int, use_answer: Optional[str],
+         handle_guess_lists=handle_guess_lists, get_input=get_input, handle_result=None):
     import colorama
     colorama.init()
     color = {
@@ -93,7 +94,10 @@ def main(num_digits: int, num_guesses: int, handle_guess_lists=handle_guess_list
     if handle_guess_lists:
         handle_guess_lists(valid_guesses, valid_guesses)
 
-    game = Wordle(valid_guesses, possible_answers=valid_guesses, num_guesses=num_guesses)
+    if use_answer:
+        game = Wordle(valid_guesses, answer=use_answer, num_guesses=num_guesses)
+    else:
+        game = Wordle(valid_guesses, possible_answers=valid_guesses, num_guesses=num_guesses)
 
     print(f'If the guess has a character in the correct position, it will appear in {color[Info.RIGHT]}GREEN{color["Reset"]}')
     print(f'If the guess has a character in the wrong position but in the word, it will appear in {color[Info.IN_WORD]}YELLOW{color["Reset"]}')
@@ -115,6 +119,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Wordle, but with numbers')
     parser.add_argument('--num_digits', default=2, type=int)
     parser.add_argument('--num_guesses', default=10, type=int)
+    parser.add_argument('--use_answer', default=None, type=int)
     args = parser.parse_args()
 
-    main(args.num_digits, args.num_guesses)
+    main(args.num_digits, args.num_guesses, args.use_answer)

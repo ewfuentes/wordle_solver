@@ -10,12 +10,12 @@ class WordleTest(unittest.TestCase):
         self.assertEqual(wordle._answer, self.ANSWER_LIST[0])
 
     def test_provide_answer_list(self):
-        wordle = Wordle(self.GUESS_LIST, possible_solutions=self.ANSWER_LIST)
+        wordle = Wordle(self.GUESS_LIST, possible_answers=self.ANSWER_LIST)
         self.assertIn(wordle._answer, self.ANSWER_LIST)
 
     def test_provide_answer_and_answer_list(self):
         with self.assertRaises(AssertionError):
-            Wordle(self.GUESS_LIST, answer=self.ANSWER_LIST[0], possible_solutions=self.ANSWER_LIST)
+            Wordle(self.GUESS_LIST, answer=self.ANSWER_LIST[0], possible_answers=self.ANSWER_LIST)
 
     def test_provide_no_answer_or_answer_list(self):
         with self.assertRaises(AssertionError):

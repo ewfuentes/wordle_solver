@@ -6,6 +6,8 @@ from typing import List, NamedTuple
 
 from wordle import Info, CharInfo, main
 
+import compute_entropy_python
+
 
 class Guess(NamedTuple):
     guess: str
@@ -47,24 +49,26 @@ def compute_entropy(guess: str, answer_list: List[str]):
     probabilities = np.array(counts) / num_answers
     return -1.0 * np.nansum(probabilities * np.log2(probabilities, where=probabilities > 0.0))
 
-def compute_ranked_guesses(guess_list: List[str], answer_list: List[str]) -> List[Guess]:
+def compute_ranked_guesses(guess_list: List[str], answer_list: List[str], use_cpp=False) -> List[Guess]:
     if len(answer_list) == 1:
         assert answer_list[0] in guess_list
         return [Guess(guess=answer_list[0], score=0.0)]
 
+    compute_entropy_func = compute_entropy_python.compute_entropy if use_cpp else compute_entropy
     guesses = []
     for guess in tqdm.tqdm(guess_list):
-        guesses.append(Guess(guess=guess, score=compute_entropy(guess, answer_list)))
+        guesses.append(Guess(guess=guess, score=compute_entropy_func(guess, answer_list)))
 
     return sorted(guesses, key=lambda x: x.score)
 
 class WordleSolver:
-    def __init__(self, valid_guesses: List[str], possible_answers: List[str]):
+    def __init__(self, valid_guesses: List[str], possible_answers: List[str], use_cpp: bool = False):
         self._valid_guesses = list(valid_guesses)
         self._possible_answers = list(possible_answers)
+        self._use_cpp = use_cpp
 
     def compute_ranked_guesses(self) -> List[Guess]:
-        return compute_ranked_guesses(self._valid_guesses, self._possible_answers)
+        return compute_ranked_guesses(self._valid_guesses, self._possible_answers, self._use_cpp)
 
 
     def handle_information(self, info: List[CharInfo]):
@@ -76,24 +80,26 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Wordle, but with numbers')
     parser.add_argument('--num_digits', default=2, type=int)
     parser.add_argument('--num_guesses', default=10, type=int)
+    parser.add_argument('--use_answer', default=None, type=int)
+    parser.add_argument('--use_cpp', default=False, action='store_true')
     args = parser.parse_args()
 
     solver = None
     def handle_guess_lists(valid_guesses: List[str], possible_answers: List[str]):
         global solver
-        solver = WordleSolver(valid_guesses, possible_answers)
+        solver = WordleSolver(valid_guesses, possible_answers, args.use_cpp)
 
     def get_input() -> str:
         ranked_guesses = solver.compute_ranked_guesses()
         guesses_from_score: Dict[float, List[str]] = {}
-        for g in ranked_guesses:
-            guess, score = g
-            guesses_from_score[score] = guesses_from_score.get(score, []) + [guess]
-
-        for score, guesses in guesses_from_score.items():
-            print('Score:', score)
-            print(guesses)
-        print('Possible Answers:', solver._possible_answers)
+#        for g in ranked_guesses:
+#            guess, score = g
+#            guesses_from_score[score] = guesses_from_score.get(score, []) + [guess]
+#
+#        for score, guesses in guesses_from_score.items():
+#            print('Score:', score)
+#            print(guesses)
+#        print('Possible Answers:', solver._possible_answers)
         return ranked_guesses[-1].guess
 
     def handle_result(result: List[CharInfo]):
@@ -101,6 +107,7 @@ if __name__ == "__main__":
 
     main(args.num_digits,
          args.num_guesses,
+         str(args.use_answer).zfill(args.num_digits),
          handle_guess_lists=handle_guess_lists,
          get_input=get_input,
          handle_result=handle_result)
