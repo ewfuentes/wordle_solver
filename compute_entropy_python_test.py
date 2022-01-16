@@ -12,7 +12,7 @@ class ComputeEntropyPythonTest(unittest.TestCase):
         cpp_entropy = compute_entropy_python.compute_entropy(guess, answer_list)
         python_entropy = wordle_solver.compute_entropy(guess, answer_list)
 
-        self.assertEqual(cpp_entropy, python_entropy)
+        self.assertAlmostEqual(cpp_entropy, python_entropy)
 
 
 if __name__ == "__main__":

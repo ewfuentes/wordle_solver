@@ -2,3 +2,6 @@
 	path = extern/pybind11
 	url = ../../pybind/pybind11
 	branch = stable
+[submodule "extern/vectorclass"]
+	path = extern/vectorclass
+	url = https://github.com/vectorclass/version2.git

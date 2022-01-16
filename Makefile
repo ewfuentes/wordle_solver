@@ -2,8 +2,8 @@
 BUILDDIR=build
 
 CXX=clang++
-CXXFLAGS=-std=c++17 -Wall -fPIC -O3 -g -fno-omit-frame-pointer -mavx2 -msse2 -msse4.1
-INC:=-I. -isystem extern/pybind11/include $(shell python3-config --includes)
+CXXFLAGS=-std=c++17 -Wall -fPIC -O2 -g -fno-omit-frame-pointer -mavx -mavx2 -msse2 -msse4.1
+INC:=-I. -isystem extern/pybind11/include -isystem extern/vectorclass $(shell python3-config --includes)
 LD=clang++
 LDFLAGS:= $(shell python3-config --ldflags) -shared -std=c++17
 
@@ -11,7 +11,7 @@ HDRS = compute_entropy.hh
 
 PYTHON_LIBRARY_NAME=compute_entropy_python$(shell python3-config --extension-suffix)
 
-all: make_dir $(PYTHON_LIBRARY_NAME)
+all: Makefile make_dir $(PYTHON_LIBRARY_NAME)
 
 $(BUILDDIR)/%.o: %.cc $(HDRS)
 	$(CXX) -c $(INC) $(CXXFLAGS) -o $@ $<

@@ -4,6 +4,7 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <smmintrin.h>
+#include <vectormath_exp.h>
 
 #include <algorithm>
 #include <cmath>
@@ -154,6 +155,42 @@ void get_categories_for_index(const int i, const int size,
   }
 }
 
+  std::ostream &operator<<(std::ostream &oss, const __m256i &reg) {
+    oss << "print int ";
+    oss << _mm256_extract_epi32(reg, 0) << " ";
+    oss << _mm256_extract_epi32(reg, 1) << " ";
+    oss << _mm256_extract_epi32(reg, 2) << " ";
+    oss << _mm256_extract_epi32(reg, 3) << " ";
+    oss << _mm256_extract_epi32(reg, 4) << " ";
+    oss << _mm256_extract_epi32(reg, 5) << " ";
+    oss << _mm256_extract_epi32(reg, 6) << " ";
+    oss << _mm256_extract_epi32(reg, 7);
+    return oss;
+  }
+
+  std::ostream &operator<<(std::ostream &oss, const __m256 &reg) {
+    const __m128 low_floats = _mm256_extractf128_ps(reg, 0);
+    const __m128 high_floats = _mm256_extractf128_ps(reg, 1);
+    int tmp;
+    oss << "print float ";
+    tmp = _mm_extract_ps(low_floats, 0);
+    oss << reinterpret_cast<float &>(tmp) << " ";
+    tmp = _mm_extract_ps(low_floats, 1);
+    oss << reinterpret_cast<float &>(tmp) << " ";
+    tmp = _mm_extract_ps(low_floats, 2);
+    oss << reinterpret_cast<float &>(tmp) << " ";
+    tmp = _mm_extract_ps(low_floats, 3);
+    oss << reinterpret_cast<float &>(tmp) << " ";
+    tmp = _mm_extract_ps(high_floats, 0);
+    oss << reinterpret_cast<float &>(tmp) << " ";
+    tmp = _mm_extract_ps(high_floats, 1);
+    oss << reinterpret_cast<float &>(tmp) << " ";
+    tmp = _mm_extract_ps(high_floats, 2);
+    oss << reinterpret_cast<float &>(tmp) << " ";
+    tmp = _mm_extract_ps(high_floats, 3);
+    oss << reinterpret_cast<float &>(tmp);
+    return oss;
+  }
 double compute_entropy(const std::string &guess,
                        const std::vector<std::string> &answers) {
   std::vector<int> counts(num_categories(guess.size()), 0);
@@ -166,14 +203,49 @@ double compute_entropy(const std::string &guess,
   }
 
   // Compute entropy
-  double entropy = 0.0;
-  for (const int count : counts) {
-    if (count > 0) {
-      const double probability = static_cast<double>(count) / answers.size();
+  float entropy = 0.0;
+  int start_idx = 0;
+  const __m256i num_elements_int = _mm256_set1_epi32(answers.size());
+  const __m256 num_elements_float = _mm256_cvtepi32_ps(num_elements_int);
+  const __m256 ones = _mm256_set1_ps(1.0f);
+  const __m256 normalizer_float = _mm256_div_ps(ones, num_elements_float);
+  auto val_or_zero = [](const int val) {
+    const float float_val = reinterpret_cast<const float &>(val);
+    return std::isfinite(float_val) ? float_val : 0.0;
+  };
+
+  for (int idx = 0; idx < counts.size() / 8; idx++) {
+    start_idx = 8 * idx;
+    // load the integer counts into a register
+    const __m256i packed_counts = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(&(counts.data()[start_idx])));
+    // convert the to a float
+    const __m256 float_counts = _mm256_cvtepi32_ps(packed_counts);
+    const __m256 probability = _mm256_mul_ps(float_counts, normalizer_float);
+    const __m256 log_prob = log2(Vec8f(probability));
+    const __m256 entropy_contrib = _mm256_mul_ps(probability, log_prob);
+
+    const __m128 low_floats = _mm256_extractf128_ps(entropy_contrib, 0);
+    const __m128 high_floats = _mm256_extractf128_ps(entropy_contrib, 1);
+    const float sum_contrib = val_or_zero(_mm_extract_ps(low_floats, 0)) +
+                              val_or_zero(_mm_extract_ps(low_floats, 1)) +
+                              val_or_zero(_mm_extract_ps(low_floats, 2)) +
+                              val_or_zero(_mm_extract_ps(low_floats, 3)) +
+                              val_or_zero(_mm_extract_ps(high_floats, 0)) +
+                              val_or_zero(_mm_extract_ps(high_floats, 1)) +
+                              val_or_zero(_mm_extract_ps(high_floats, 2)) +
+                              val_or_zero(_mm_extract_ps(high_floats, 3));
+    entropy += -sum_contrib;
+  }
+  start_idx += 8;
+
+  for (int idx = start_idx; start_idx < counts.size(); start_idx++) {
+    if (counts[idx] > 0) {
+      const float probability =
+          static_cast<float>(counts[idx]) / answers.size();
       entropy += -probability * std::log2(probability);
     }
   }
 
   return entropy;
-}
+} // namespace erick
 } // namespace erick
