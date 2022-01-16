@@ -2,12 +2,13 @@
 import itertools
 import numpy as np
 import tqdm
+import multiprocessing
+import functools
 from typing import List, NamedTuple
 
 from wordle import Info, CharInfo, main
 
 import compute_entropy_python
-
 
 class Guess(NamedTuple):
     guess: str
@@ -49,15 +50,30 @@ def compute_entropy(guess: str, answer_list: List[str]):
     probabilities = np.array(counts) / num_answers
     return -1.0 * np.nansum(probabilities * np.log2(probabilities, where=probabilities > 0.0))
 
+def compute_guess_scores(guess_list: List[str], answer_list: List[str]):
+    guesses = []
+    for guess in guess_list:
+        guesses.append(Guess(guess=guess, score=compute_entropy_python.compute_entropy(guess, answer_list)))
+    return guesses
+
 def compute_ranked_guesses(guess_list: List[str], answer_list: List[str], use_cpp=False) -> List[Guess]:
     if len(answer_list) == 1:
         assert answer_list[0] in guess_list
         return [Guess(guess=answer_list[0], score=0.0)]
 
-    compute_entropy_func = compute_entropy_python.compute_entropy if use_cpp else compute_entropy
-    guesses = []
-    for guess in tqdm.tqdm(guess_list):
-        guesses.append(Guess(guess=guess, score=compute_entropy_func(guess, answer_list)))
+    func = functools.partial(compute_guess_scores, answer_list=answer_list)
+    with multiprocessing.Pool(multiprocessing.cpu_count() / 2) as pool:
+        def chunker(l: List[str], chunksize: int):
+            out = []
+            for start_idx in range(0, len(l), chunksize):
+                out.append(l[start_idx:start_idx+chunksize])
+            return out
+
+        results = pool.map_async(func, tqdm.tqdm(chunker(guess_list, 100)))
+        pool.close()
+        pool.join()
+
+    guesses = itertools.chain(*results.get())
 
     return sorted(guesses, key=lambda x: x.score)
 
