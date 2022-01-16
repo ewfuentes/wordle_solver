@@ -1,6 +1,7 @@
 
 import itertools
 import numpy as np
+import tqdm
 from typing import List, NamedTuple
 
 from wordle import Info, CharInfo, main
@@ -52,7 +53,7 @@ def compute_ranked_guesses(guess_list: List[str], answer_list: List[str]) -> Lis
         return [Guess(guess=answer_list[0], score=0.0)]
 
     guesses = []
-    for guess in guess_list:
+    for guess in tqdm.tqdm(guess_list):
         guesses.append(Guess(guess=guess, score=compute_entropy(guess, answer_list)))
 
     return sorted(guesses, key=lambda x: x.score)
