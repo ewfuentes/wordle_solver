@@ -2,7 +2,7 @@
 BUILDDIR=build
 
 CXX=clang++
-CXXFLAGS=-std=c++17 -Wall -Wpedantic -fPIC -O3 -g -fno-omit-frame-pointer
+CXXFLAGS=-std=c++17 -Wall -fPIC -O3 -g -fno-omit-frame-pointer -mavx2 -msse2 -msse4.1
 INC:=-I. -isystem extern/pybind11/include $(shell python3-config --includes)
 LD=clang++
 LDFLAGS:= $(shell python3-config --ldflags) -shared -std=c++17
