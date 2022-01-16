@@ -6,10 +6,13 @@
 #include <smmintrin.h>
 #include <vectormath_exp.h>
 
+#include <boost/dynamic_bitset.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <ios>
+#include <iomanip>
 #include <iostream>
 
 namespace erick {
@@ -53,44 +56,28 @@ std::ostream &operator<<(std::ostream &oss, const std::vector<T> &vec) {
   return oss;
 }
 
-__m128i get_size_mask(const int i) {
-  const __m128i all_ones = _mm_set1_epi8(0xFF);
-  switch (i) {
-  case 15:
-    return _mm_bsrli_si128(all_ones, 1);
-  case 14:
-    return _mm_bsrli_si128(all_ones, 2);
-  case 13:
-    return _mm_bsrli_si128(all_ones, 3);
-  case 12:
-    return _mm_bsrli_si128(all_ones, 4);
-  case 11:
-    return _mm_bsrli_si128(all_ones, 5);
-  case 10:
-    return _mm_bsrli_si128(all_ones, 6);
-  case 9:
-    return _mm_bsrli_si128(all_ones, 7);
-  case 8:
-    return _mm_bsrli_si128(all_ones, 8);
-  case 7:
-    return _mm_bsrli_si128(all_ones, 9);
-  case 6:
-    return _mm_bsrli_si128(all_ones, 10);
-  case 5:
-    return _mm_bsrli_si128(all_ones, 11);
-  case 4:
-    return _mm_bsrli_si128(all_ones, 12);
-  case 3:
-    return _mm_bsrli_si128(all_ones, 13);
-  case 2:
-    return _mm_bsrli_si128(all_ones, 14);
-  case 1:
-    return _mm_bsrli_si128(all_ones, 15);
-  case 0:
-    return _mm_bsrli_si128(all_ones, 16);
-  default:
-    return all_ones;
+template <typename T> T get_byte_mask(const int bit_mask) {
+  std::array<int, sizeof(T) / 4> bytes;
+  auto bytes_from_bits = [](int bits) -> int {
+    int out = 0;
+    for (int i = 3; i >= 0; i--) {
+      out = (out << 8) | ((bits & (1 << i)) ? 0xFF : 0x00);
+    }
+    return out;
+  };
+  for (int byte_idx = 0; byte_idx < bytes.size(); byte_idx++) {
+    bytes[byte_idx] = bytes_from_bits((bit_mask >> (byte_idx * 4)) & 0x0F);
   }
+  if constexpr (bytes.size() == 4) {
+    return std::apply(_mm_setr_epi32, bytes);
+  } else if (bytes.size() == 8) {
+    return std::apply(_mm256_setr_epi32, bytes);
+  }
+}
+
+template <typename T> T get_byte_mask(const int size, const int start) {
+  const int bit_mask = ((1 << size) - 1) << start;
+  return get_byte_mask<T>(bit_mask);
 }
 
 bool word_matches_guess_categories(const std::string &guess,
@@ -102,7 +89,7 @@ bool word_matches_guess_categories(const std::string &guess,
   word_reg = *reinterpret_cast<const __m128i *>(word.data());
   // Create a mask for the bytes that are valid. Note that valid bytes are set
   // to zero
-  const __m128i word_mask = get_size_mask(word.size());
+  const __m128i word_mask = get_byte_mask<__m128i>(word.size(), 0);
   for (int i = 0; i < static_cast<int>(categories.size()); i++) {
     const char letter = guess[i];
     // Pack the current character into all bytes of a register
@@ -137,12 +124,161 @@ bool word_matches_guess_categories(const std::string &guess,
   return true;
 }
 
-int compute_counts(const std::string &guess,
-                   const std::vector<std::string> &answers,
-                   const std::vector<Category> &categories) {
-  return std::count_if(answers.begin(), answers.end(), [&](const auto &word) {
-    return word_matches_guess_categories(guess, word, categories);
-  });
+std::ostream &operator<<(std::ostream &oss, const __m256i &reg) {
+  oss << "print int " << std::hex;
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 0) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 1) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 2) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 3) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 4) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 5) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 6) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 7) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 8 + 0) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 8 + 1) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 8 + 2) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 8 + 3) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 8 + 4) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 8 + 5) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 8 + 6) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 8 + 7) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 16 + 0) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 16 + 1) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 16 + 2) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 16 + 3) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 16 + 4) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 16 + 5) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 16 + 6) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 16 + 7) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 24 + 0) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 24 + 1) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 24 + 2) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 24 + 3) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 24 + 4) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 24 + 5) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 24 + 6) << " ";
+  oss << std::setw(2) << _mm256_extract_epi8(reg, 24 + 7) << std::dec;
+  return oss;
+}
+
+std::ostream &operator<<(std::ostream &oss, const __m256 &reg) {
+  const __m128 low_floats = _mm256_extractf128_ps(reg, 0);
+  const __m128 high_floats = _mm256_extractf128_ps(reg, 1);
+  int tmp;
+  oss << "print float ";
+  tmp = _mm_extract_ps(low_floats, 0);
+  oss << reinterpret_cast<float &>(tmp) << " ";
+  tmp = _mm_extract_ps(low_floats, 1);
+  oss << reinterpret_cast<float &>(tmp) << " ";
+  tmp = _mm_extract_ps(low_floats, 2);
+  oss << reinterpret_cast<float &>(tmp) << " ";
+  tmp = _mm_extract_ps(low_floats, 3);
+  oss << reinterpret_cast<float &>(tmp) << " ";
+  tmp = _mm_extract_ps(high_floats, 0);
+  oss << reinterpret_cast<float &>(tmp) << " ";
+  tmp = _mm_extract_ps(high_floats, 1);
+  oss << reinterpret_cast<float &>(tmp) << " ";
+  tmp = _mm_extract_ps(high_floats, 2);
+  oss << reinterpret_cast<float &>(tmp) << " ";
+  tmp = _mm_extract_ps(high_floats, 3);
+  oss << reinterpret_cast<float &>(tmp);
+  return oss;
+}
+
+std::vector<char> pack_strings(const std::vector<std::string> &strs) {
+  std::vector<char> out;
+  out.reserve(strs.size() * strs[0].size());
+  for (const std::string &str : strs) {
+    std::copy(str.begin(), str.end(), std::back_inserter(out));
+  }
+  return out;
+}
+
+boost::dynamic_bitset<>
+compute_wrong_condition(const char letter, const int guess_size,
+                        const std::vector<char> packed_answers) {
+  boost::dynamic_bitset<> out(packed_answers.size() / guess_size);
+  // Since we are using 256 bit registers, we can read up to 32/guess size words
+  // at a time
+  const int step_size = 32 / guess_size;
+  const int num_words = packed_answers.size() / guess_size;
+  const __m256i letter_reg = _mm256_set1_epi8(letter);
+  std::vector<__m256i> word_masks;
+  // Get the word masks
+  for (int i = 0; i < step_size; i++) {
+    word_masks.push_back(get_byte_mask<__m256i>(guess_size, i * guess_size));
+  }
+
+  for (int word_idx = 0; word_idx < num_words; word_idx += step_size) {
+    const int start_idx = word_idx * guess_size;
+    const __m256i answer_reg = _mm256_loadu_si256(
+        reinterpret_cast<const __m256i *>(&packed_answers[start_idx]));
+    const __m256i is_equal_reg = _mm256_cmpeq_epi8(answer_reg, letter_reg);
+    for (int packed_word_idx = 0;
+         packed_word_idx < step_size && word_idx + packed_word_idx < out.size();
+         packed_word_idx++) {
+      // Check if there were no matches for the current letter in this word
+      const bool no_matches_in_word =
+          _mm256_testz_si256(is_equal_reg, word_masks[packed_word_idx]);
+      // This word belongs if there are no matches for the current letter in
+      // this word
+      out.set(word_idx + packed_word_idx, no_matches_in_word);
+    }
+  }
+  return out;
+}
+
+boost::dynamic_bitset<>
+compute_in_word_condition(const char letter, const int letter_idx,
+                          const int guess_size,
+                          const std::vector<char> packed_answers) {
+  boost::dynamic_bitset<> out(packed_answers.size() / guess_size);
+  // Since we are using 256 bit registers, we can read up to 32/guess size words
+  // at a time
+  const int step_size = 32 / guess_size;
+  const int num_words = packed_answers.size() / guess_size;
+  const __m256i letter_reg = _mm256_set1_epi8(letter);
+  std::vector<__m256i> word_masks;
+  // Get the word masks. Note that we remove the current letter from the match
+  int bit_mask = ((1 << guess_size) - 1) & (~(1 << letter_idx));
+  for (int i = 0; i < step_size; i++) {
+    word_masks.push_back(get_byte_mask<__m256i>(bit_mask << (i * guess_size)));
+  }
+
+  for (int word_idx = 0; word_idx < num_words; word_idx += step_size) {
+    const int start_idx = word_idx * guess_size;
+    const __m256i answer_reg = _mm256_loadu_si256(
+        reinterpret_cast<const __m256i *>(&packed_answers[start_idx]));
+    const __m256i is_equal_reg = _mm256_cmpeq_epi8(answer_reg, letter_reg);
+    for (int packed_word_idx = 0;
+         packed_word_idx < step_size && word_idx + packed_word_idx < out.size();
+         packed_word_idx++) {
+      // Check if there were no matches for the current letter in this word
+      const bool at_least_one_match_elsewhere_in_word =
+          !_mm256_testz_si256(is_equal_reg, word_masks[packed_word_idx]);
+      const bool no_match_in_position =
+          letter !=
+          packed_answers[(word_idx + packed_word_idx) * guess_size +
+                         letter_idx];
+      // This word belongs if there is at least one match for the current letter
+      // in this word and it doesn't match at letter idx
+      out.set(word_idx + packed_word_idx,
+              at_least_one_match_elsewhere_in_word && no_match_in_position);
+    }
+  }
+  return out;
+}
+
+boost::dynamic_bitset<>
+compute_right_condition(const char letter, const int letter_idx,
+                        const int guess_size,
+                        const std::vector<char> packed_answers) {
+  boost::dynamic_bitset<> out(packed_answers.size() / guess_size);
+  for (int idx = letter_idx; idx < packed_answers.size(); idx += guess_size) {
+    const int word_idx = idx / guess_size;
+    out.set(word_idx, packed_answers[idx] == letter);
+  }
+  return out;
 }
 
 void get_categories_for_index(const int i, const int size,
@@ -155,52 +291,45 @@ void get_categories_for_index(const int i, const int size,
   }
 }
 
-  std::ostream &operator<<(std::ostream &oss, const __m256i &reg) {
-    oss << "print int ";
-    oss << _mm256_extract_epi32(reg, 0) << " ";
-    oss << _mm256_extract_epi32(reg, 1) << " ";
-    oss << _mm256_extract_epi32(reg, 2) << " ";
-    oss << _mm256_extract_epi32(reg, 3) << " ";
-    oss << _mm256_extract_epi32(reg, 4) << " ";
-    oss << _mm256_extract_epi32(reg, 5) << " ";
-    oss << _mm256_extract_epi32(reg, 6) << " ";
-    oss << _mm256_extract_epi32(reg, 7);
-    return oss;
+std::vector<int> compute_counts(const std::string &guess,
+                                const std::vector<std::string> &answers) {
+  // This function computes whether or not a word belongs in anyone of the given
+  // colorings of the word membership to a given coloring can be be determined
+  // by ANDing the membership to the coloring of each character individually.
+  // The first index is on the letter, the next is on the category and the last
+  // is on whether the particular answer satisfies that condition;
+  std::vector<std::vector<boost::dynamic_bitset<>>> conditions_satisfied;
+  std::vector<char> packed_answers = pack_strings(answers);
+
+  for (int letter_idx = 0; letter_idx < guess.size(); letter_idx++) {
+    conditions_satisfied.push_back({});
+    conditions_satisfied.back().push_back(compute_wrong_condition(
+        guess[letter_idx], guess.size(), packed_answers));
+    conditions_satisfied.back().push_back(compute_in_word_condition(
+        guess[letter_idx], letter_idx, guess.size(), packed_answers));
+    conditions_satisfied.back().push_back(compute_right_condition(
+        guess[letter_idx], letter_idx, guess.size(), packed_answers));
   }
 
-  std::ostream &operator<<(std::ostream &oss, const __m256 &reg) {
-    const __m128 low_floats = _mm256_extractf128_ps(reg, 0);
-    const __m128 high_floats = _mm256_extractf128_ps(reg, 1);
-    int tmp;
-    oss << "print float ";
-    tmp = _mm_extract_ps(low_floats, 0);
-    oss << reinterpret_cast<float &>(tmp) << " ";
-    tmp = _mm_extract_ps(low_floats, 1);
-    oss << reinterpret_cast<float &>(tmp) << " ";
-    tmp = _mm_extract_ps(low_floats, 2);
-    oss << reinterpret_cast<float &>(tmp) << " ";
-    tmp = _mm_extract_ps(low_floats, 3);
-    oss << reinterpret_cast<float &>(tmp) << " ";
-    tmp = _mm_extract_ps(high_floats, 0);
-    oss << reinterpret_cast<float &>(tmp) << " ";
-    tmp = _mm_extract_ps(high_floats, 1);
-    oss << reinterpret_cast<float &>(tmp) << " ";
-    tmp = _mm_extract_ps(high_floats, 2);
-    oss << reinterpret_cast<float &>(tmp) << " ";
-    tmp = _mm_extract_ps(high_floats, 3);
-    oss << reinterpret_cast<float &>(tmp);
-    return oss;
+  // Now compute the counts per color
+  std::vector<int> out(num_categories(guess.size()), 0);
+  std::vector<Category> categories;
+  for (int category_idx = 0; category_idx < out.size(); category_idx++) {
+    get_categories_for_index(category_idx, guess.size(), categories);
+    boost::dynamic_bitset<> curr_members = conditions_satisfied[0][categories[0]];
+    for (int letter_idx = 1; letter_idx < guess.size(); letter_idx++) {
+      curr_members = curr_members & conditions_satisfied[letter_idx][categories[letter_idx]];
+    }
+    out.at(category_idx) = curr_members.count();
   }
+  return out;
+}
+
 double compute_entropy(const std::string &guess,
                        const std::vector<std::string> &answers) {
-  std::vector<int> counts(num_categories(guess.size()), 0);
 
   // Compute the counts
-  std::vector<Category> categories;
-  for (int idx = 0; idx < counts.size(); idx++) {
-    get_categories_for_index(idx, guess.size(), categories);
-    counts[idx] = compute_counts(guess, answers, categories);
-  }
+  const std::vector<int> counts = compute_counts(guess, answers);
 
   // Compute entropy
   float entropy = 0.0;
@@ -217,7 +346,8 @@ double compute_entropy(const std::string &guess,
   for (int idx = 0; idx < counts.size() / 8; idx++) {
     start_idx = 8 * idx;
     // load the integer counts into a register
-    const __m256i packed_counts = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(&(counts.data()[start_idx])));
+    const __m256i packed_counts = _mm256_loadu_si256(
+        reinterpret_cast<const __m256i *>(&(counts.data()[start_idx])));
     // convert the to a float
     const __m256 float_counts = _mm256_cvtepi32_ps(packed_counts);
     const __m256 probability = _mm256_mul_ps(float_counts, normalizer_float);
@@ -247,5 +377,5 @@ double compute_entropy(const std::string &guess,
   }
 
   return entropy;
-} // namespace erick
+}
 } // namespace erick
