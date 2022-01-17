@@ -107,6 +107,13 @@ if __name__ == "__main__":
 
     def get_input() -> str:
         ranked_guesses = solver.compute_ranked_guesses()
+        print('Possible answers left:', len(solver._possible_answers))
+        if len(solver._possible_answers) < 20:
+            print(solver._possible_answers)
+        print('Best Guesses:')
+        for i, guess in enumerate(ranked_guesses[-10:]):
+            print(i, guess)
+
         return ranked_guesses[-1].guess
 
 
