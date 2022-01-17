@@ -6,7 +6,7 @@ import multiprocessing
 import functools
 from typing import List, NamedTuple
 
-from wordle import Info, CharInfo, main
+from wordle import Info, CharInfo, main, GameState
 
 import compute_entropy_python
 
@@ -57,6 +57,7 @@ def compute_guess_scores(guess_list: List[str], answer_list: List[str]):
     return guesses
 
 def compute_ranked_guesses(guess_list: List[str], answer_list: List[str]) -> List[Guess]:
+    assert len(answer_list) > 0
     if len(answer_list) == 1:
         assert answer_list[0] in guess_list
         return [Guess(guess=answer_list[0], score=0.0)]
@@ -96,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_digits', default=2, type=int)
     parser.add_argument('--num_guesses', default=10, type=int)
     parser.add_argument('--use_answer', default=None, type=int)
+    parser.add_argument('--use_words', default=False, action='store_true')
     args = parser.parse_args()
 
     solver = None
@@ -105,15 +107,18 @@ if __name__ == "__main__":
 
     def get_input() -> str:
         ranked_guesses = solver.compute_ranked_guesses()
-        guesses_from_score: Dict[float, List[str]] = {}
         return ranked_guesses[-1].guess
 
-    def handle_result(result: List[CharInfo]):
-        solver.handle_information(result)
+
+    def handle_result(result: GameState):
+        assert result.answer in solver._possible_answers, 'Answer not in possible list before update'
+        solver.handle_information(result.information[-1])
+        assert result.answer in solver._possible_answers, 'Answer not in possible list after update'
 
     main(args.num_digits,
          args.num_guesses,
-         str(args.use_answer).zfill(args.num_digits),
+         str(args.use_answer).zfill(args.num_digits) if args.use_answer else None,
+         use_words=args.use_words,
          handle_guess_lists=handle_guess_lists,
          get_input=get_input,
          handle_result=handle_result)

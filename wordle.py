@@ -16,6 +16,7 @@ class GameState(NamedTuple):
     is_finished: bool
     is_winner: bool
     guesses_remaining: int
+    answer: str
     information: List[List[CharInfo]]
 
 
@@ -47,7 +48,7 @@ class Wordle:
 
     def step(self, guess: str, game_state: Optional[GameState]) -> GameState:
         if game_state is None:
-            game_state = GameState(is_finished=False, is_winner=False, guesses_remaining=self._num_guesses, information=[])
+            game_state = GameState(is_finished=False, is_winner=False, answer=self._answer, guesses_remaining=self._num_guesses, information=[])
 
         if game_state.is_finished:
             return game_state
@@ -63,6 +64,7 @@ class Wordle:
 
         return GameState(is_finished=is_finished,
                          is_winner=is_winner,
+                         answer=self._answer,
                          guesses_remaining=guesses_remaining,
                          information = game_state.information + [new_information])
 
@@ -73,6 +75,7 @@ def get_input() -> str:
     return input(f'Enter a guess:').strip()
 
 def main(num_digits: int, num_guesses: int, use_answer: Optional[str],
+         use_words: bool = False,
          handle_guess_lists=handle_guess_lists, get_input=get_input, handle_result=None):
     import colorama
     colorama.init()
@@ -89,15 +92,21 @@ def main(num_digits: int, num_guesses: int, use_answer: Optional[str],
         out += color['Reset']
         return out
 
-    valid_guesses = [str(x).zfill(num_digits) for x in range(10**num_digits)]
+    if use_words:
+        import words
+        valid_guesses = words.valid_guesses + words.possible_answers
+        possible_answers = words.possible_answers
+    else:
+        valid_guesses = [str(x).zfill(num_digits) for x in range(10**num_digits)]
+        possible_answers = valid_guesses
 
     if handle_guess_lists:
-        handle_guess_lists(valid_guesses, valid_guesses)
+        handle_guess_lists(valid_guesses, possible_answers)
 
     if use_answer:
         game = Wordle(valid_guesses, answer=use_answer, num_guesses=num_guesses)
     else:
-        game = Wordle(valid_guesses, possible_answers=valid_guesses, num_guesses=num_guesses)
+        game = Wordle(valid_guesses, possible_answers=possible_answers, num_guesses=num_guesses)
 
     print(f'If the guess has a character in the correct position, it will appear in {color[Info.RIGHT]}GREEN{color["Reset"]}')
     print(f'If the guess has a character in the wrong position but in the word, it will appear in {color[Info.IN_WORD]}YELLOW{color["Reset"]}')
@@ -108,7 +117,7 @@ def main(num_digits: int, num_guesses: int, use_answer: Optional[str],
         guess = get_input()
         state = game.step(guess, state)
         if handle_result:
-            handle_result(state.information[-1])
+            handle_result(state)
         if not state.is_finished:
             print(f'Guesses Remaining: {state.guesses_remaining} Result: {info_to_str(state.information[-1])}')
     print(f'Winner! The answer was {info_to_str(state.information[-1])}.'
@@ -120,6 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_digits', default=2, type=int)
     parser.add_argument('--num_guesses', default=10, type=int)
     parser.add_argument('--use_answer', default=None, type=int)
+    parser.add_argument('--use_words', default=False, action='store_true')
     args = parser.parse_args()
 
-    main(args.num_digits, args.num_guesses, args.use_answer)
+    main(args.num_digits, args.num_guesses, args.use_answer, args.use_words)
