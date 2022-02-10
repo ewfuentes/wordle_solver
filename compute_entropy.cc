@@ -11,12 +11,14 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
-#include <ios>
 #include <iomanip>
+#include <ios>
 #include <iostream>
+#include <map>
+#include <numeric>
+#include <set>
 
 namespace erick {
-enum Category { WRONG = 0, IN_WORD = 1, RIGHT = 2 };
 
 int num_categories(const int size) {
   int num_cats = 1;
@@ -122,9 +124,8 @@ compute_in_word_condition(const char letter, const int letter_idx,
       const bool at_least_one_match_elsewhere_in_word =
           !_mm256_testz_si256(is_equal_reg, word_masks[packed_word_idx]);
       const bool no_match_in_position =
-          letter !=
-          packed_answers[(word_idx + packed_word_idx) * guess_size +
-                         letter_idx];
+          letter != packed_answers[(word_idx + packed_word_idx) * guess_size +
+                                   letter_idx];
       // This word belongs if there is at least one match for the current letter
       // in this word and it doesn't match at letter idx
       out.set(word_idx + packed_word_idx,
@@ -146,55 +147,11 @@ compute_right_condition(const char letter, const int letter_idx,
   return out;
 }
 
-void get_categories_for_index(const int i, const int size,
-                              std::vector<Category> &categories) {
-  categories.clear();
-  int tmp = i;
-  for (int idx = 0; idx < size; idx++) {
-    categories.push_back(static_cast<Category>(tmp % 3));
-    tmp = tmp / 3;
-  }
-}
-
-std::vector<int> compute_counts(const std::string &guess,
-                                const std::vector<std::string> &answers) {
-  // This function computes whether or not a word belongs in anyone of the given
-  // colorings of the word membership to a given coloring can be be determined
-  // by ANDing the membership to the coloring of each character individually.
-  // The first index is on the letter, the next is on the category and the last
-  // is on whether the particular answer satisfies that condition;
-  std::vector<std::vector<boost::dynamic_bitset<>>> conditions_satisfied;
-  std::vector<char> packed_answers = pack_strings(answers);
-
-  for (int letter_idx = 0; letter_idx < guess.size(); letter_idx++) {
-    conditions_satisfied.push_back({});
-    conditions_satisfied.back().push_back(compute_wrong_condition(
-        guess[letter_idx], guess.size(), packed_answers));
-    conditions_satisfied.back().push_back(compute_in_word_condition(
-        guess[letter_idx], letter_idx, guess.size(), packed_answers));
-    conditions_satisfied.back().push_back(compute_right_condition(
-        guess[letter_idx], letter_idx, guess.size(), packed_answers));
-  }
-
-  // Now compute the counts per color
-  std::vector<int> out(num_categories(guess.size()), 0);
-  std::vector<Category> categories;
-  for (int category_idx = 0; category_idx < out.size(); category_idx++) {
-    get_categories_for_index(category_idx, guess.size(), categories);
-    boost::dynamic_bitset<> curr_members = conditions_satisfied[0][categories[0]];
-    for (int letter_idx = 1; letter_idx < guess.size(); letter_idx++) {
-      curr_members = curr_members & conditions_satisfied[letter_idx][categories[letter_idx]];
-    }
-    out.at(category_idx) = curr_members.count();
-  }
-  return out;
-}
-
 double compute_entropy(const std::string &guess,
                        const std::vector<std::string> &answers) {
 
   // Compute the counts
-  const std::vector<int> counts = compute_counts(guess, answers);
+  const std::vector<int> counts = detail::compute_counts(guess, answers);
 
   // Compute entropy
   float entropy = 0.0;
@@ -243,4 +200,109 @@ double compute_entropy(const std::string &guess,
 
   return entropy;
 }
+
+namespace detail {
+void get_categories_for_index(const int i, const int size,
+                              std::vector<Category> &categories) {
+  categories.clear();
+  int tmp = i;
+  for (int idx = 0; idx < size; idx++) {
+    categories.push_back(static_cast<Category>(tmp % 3));
+    tmp = tmp / 3;
+  }
+}
+std::vector<int> compute_counts(const std::string &guess,
+                                const std::vector<std::string> &answers) {
+  // This function computes whether or not a word belongs in anyone of the given
+  // colorings of the word membership to a given coloring can be be determined
+  // by ANDing the membership to the coloring of each character individually.
+  // The first index is on the letter, the next is on the category and the last
+  // is on whether the particular answer satisfies that condition;
+  std::vector<std::vector<boost::dynamic_bitset<>>> conditions_satisfied;
+  std::vector<char> packed_answers = pack_strings(answers);
+
+  for (int letter_idx = 0; letter_idx < guess.size(); letter_idx++) {
+    conditions_satisfied.push_back({});
+    conditions_satisfied.back().push_back(compute_wrong_condition(
+        guess[letter_idx], guess.size(), packed_answers));
+    conditions_satisfied.back().push_back(compute_in_word_condition(
+        guess[letter_idx], letter_idx, guess.size(), packed_answers));
+    conditions_satisfied.back().push_back(compute_right_condition(
+        guess[letter_idx], letter_idx, guess.size(), packed_answers));
+  }
+
+  // In word condition is set if the current letter does not exist at the
+  // position indicated by the guess, but it does exist elsewhere in the answer.
+  // This is almost correct. If the guess contains a repeated letter, the
+  // answer has no repeated letters, and one of the repeated letters in the
+  // guess is correct, then all repeated instances are marked as incorrect.
+  // If the answer has repeated letters, then up to that many instances of the
+  // letter are marked as being in the word or correct.
+
+  // Create sets of repeated letters
+  std::map<char, std::vector<int>> letter_sets;
+  for (int i = 0; i < guess.size(); i++) {
+    letter_sets[guess[i]].push_back(i);
+  }
+
+  for (const auto &letter_and_pos : letter_sets) {
+    if (letter_and_pos.second.size() < 2) {
+      continue;
+    }
+    // We have a guess that contains a double letter
+    // Find all words that contain this letter by or-ing the right and in word
+    // answers
+    const auto all_with_letter = [&]() {
+      boost::dynamic_bitset<> in_word(answers.size());
+      for (const int pos : letter_and_pos.second) {
+        in_word |= conditions_satisfied[pos][IN_WORD] |
+                   conditions_satisfied[pos][RIGHT];
+      }
+      return in_word;
+    }();
+
+    for (int pos = all_with_letter.find_first(); pos != all_with_letter.npos;
+         pos = all_with_letter.find_next(pos)) {
+      // For each word identified, compute the number of letters of this value
+      const std::string curr_answer = answers.at(pos);
+      const int num_letter_in_answer = std::count(
+          curr_answer.begin(), curr_answer.end(), letter_and_pos.first);
+      // Count the number of this letter that is are correct
+      const int num_right =
+          std::count_if(letter_and_pos.second.begin(),
+                        letter_and_pos.second.end(), [&](const int idx) {
+                          return conditions_satisfied[idx][RIGHT].test(pos);
+                        });
+      // This means that we much have num_letter_in_answer - num_right in_words
+      // mark the remaining ones as wrong
+      int num_in_word_remaining = num_letter_in_answer - num_right;
+      for (const int letter_idx : letter_and_pos.second) {
+        if (conditions_satisfied[letter_idx][IN_WORD].test(pos)) {
+          if (num_in_word_remaining) {
+            num_in_word_remaining--;
+          } else {
+            conditions_satisfied[letter_idx][IN_WORD].reset(pos);
+            conditions_satisfied[letter_idx][WRONG].set(pos);
+          }
+        }
+      }
+    }
+  }
+
+  // Now compute the counts per color
+  std::vector<int> out(num_categories(guess.size()), 0);
+  std::vector<Category> categories;
+  for (int category_idx = 0; category_idx < out.size(); category_idx++) {
+    get_categories_for_index(category_idx, guess.size(), categories);
+    boost::dynamic_bitset<> curr_members =
+        conditions_satisfied[0][categories[0]];
+    for (int letter_idx = 1; letter_idx < guess.size(); letter_idx++) {
+      curr_members = curr_members &
+                     conditions_satisfied[letter_idx][categories[letter_idx]];
+    }
+    out.at(category_idx) = curr_members.count();
+  }
+  return out;
+}
+} // namespace detail
 } // namespace erick
