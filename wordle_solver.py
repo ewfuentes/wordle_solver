@@ -56,7 +56,7 @@ def compute_guess_scores(guess_list: List[str], answer_list: List[str]):
         guesses.append(Guess(guess=guess, score=compute_entropy_python.compute_entropy(guess, answer_list)))
     return guesses
 
-def compute_ranked_guesses(guess_list: List[str], answer_list: List[str]) -> List[Guess]:
+def compute_ranked_guesses(guess_list: List[str], answer_list: List[str], quiet: bool=False) -> List[Guess]:
     assert len(answer_list) > 0
     if len(answer_list) == 1:
         assert answer_list[0] in guess_list
@@ -70,7 +70,7 @@ def compute_ranked_guesses(guess_list: List[str], answer_list: List[str]) -> Lis
                 out.append(l[start_idx:start_idx+chunksize])
             return out
 
-        results = pool.map_async(func, tqdm.tqdm(chunker(guess_list, 100)))
+        results = pool.map_async(func, tqdm.tqdm(chunker(guess_list, 100), disable=quiet))
         pool.close()
         pool.join()
 
@@ -79,12 +79,13 @@ def compute_ranked_guesses(guess_list: List[str], answer_list: List[str]) -> Lis
     return sorted(guesses, key=lambda x: x.score)
 
 class WordleSolver:
-    def __init__(self, valid_guesses: List[str], possible_answers: List[str]):
+    def __init__(self, valid_guesses: List[str], possible_answers: List[str], quiet: bool = False):
         self._valid_guesses = list(valid_guesses)
         self._possible_answers = list(possible_answers)
+        self._quiet = quiet
 
     def compute_ranked_guesses(self) -> List[Guess]:
-        return compute_ranked_guesses(self._valid_guesses, self._possible_answers)
+        return compute_ranked_guesses(self._valid_guesses, self._possible_answers, self._quiet)
 
 
     def handle_information(self, info: List[CharInfo]):
@@ -96,7 +97,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Wordle, but with numbers')
     parser.add_argument('--num_digits', default=2, type=int)
     parser.add_argument('--num_guesses', default=10, type=int)
-    parser.add_argument('--use_answer', default=None, type=int)
+    parser.add_argument('--use_answer', default=None, type=str)
     parser.add_argument('--use_words', default=False, action='store_true')
     args = parser.parse_args()
 

@@ -37,7 +37,10 @@ def compute_information(guess: str, answer: str) -> Tuple[bool, List[CharInfo]]:
 
 
 class Wordle:
-    def __init__(self, valid_guesses: List[str], answer: Optional[str] = None, possible_answers: Optional[List[str]] = None, num_guesses: int = 6):
+    def __init__(self, valid_guesses: List[str],
+                 answer: Optional[str] = None,
+                 possible_answers: Optional[List[str]] = None,
+                 num_guesses: int = 6):
         assert (answer is None) ^ (possible_answers is None), 'answer or possible_answers must be specified, but not both'
         if answer:
             self._answer = answer.lower()
@@ -48,7 +51,11 @@ class Wordle:
 
     def step(self, guess: str, game_state: Optional[GameState]) -> GameState:
         if game_state is None:
-            game_state = GameState(is_finished=False, is_winner=False, answer=self._answer, guesses_remaining=self._num_guesses, information=[])
+            game_state = GameState(is_finished=False,
+                                   is_winner=False,
+                                   answer=self._answer,
+                                   guesses_remaining=self._num_guesses,
+                                   information=[])
 
         if game_state.is_finished:
             return game_state
@@ -76,7 +83,8 @@ def get_input() -> str:
 
 def main(num_digits: int, num_guesses: int, use_answer: Optional[str],
          use_words: bool = False,
-         handle_guess_lists=handle_guess_lists, get_input=get_input, handle_result=None):
+         handle_guess_lists=handle_guess_lists, get_input=get_input, handle_result=None,
+         quiet=False):
     import colorama
     colorama.init()
     color = {
@@ -95,7 +103,7 @@ def main(num_digits: int, num_guesses: int, use_answer: Optional[str],
     if use_words:
         import words
         valid_guesses = words.valid_guesses + words.possible_answers
-        possible_answers = words.possible_answers
+        possible_answers = words.valid_guesses + words.possible_answers
     else:
         valid_guesses = [str(x).zfill(num_digits) for x in range(10**num_digits)]
         possible_answers = valid_guesses
@@ -108,9 +116,10 @@ def main(num_digits: int, num_guesses: int, use_answer: Optional[str],
     else:
         game = Wordle(valid_guesses, possible_answers=possible_answers, num_guesses=num_guesses)
 
-    print(f'If the guess has a character in the correct position, it will appear in {color[Info.RIGHT]}GREEN{color["Reset"]}')
-    print(f'If the guess has a character in the wrong position but in the word, it will appear in {color[Info.IN_WORD]}YELLOW{color["Reset"]}')
-    print(f'If the guess has a character that is not in the answer, it will appear in {color[Info.WRONG]}WHITE{color["Reset"]}')
+    if not quiet:
+        print(f'If the guess has a character in the correct position, it will appear in {color[Info.RIGHT]}GREEN{color["Reset"]}')
+        print(f'If the guess has a character in the wrong position but in the word, it will appear in {color[Info.IN_WORD]}YELLOW{color["Reset"]}')
+        print(f'If the guess has a character that is not in the answer, it will appear in {color[Info.WRONG]}WHITE{color["Reset"]}')
 
     state = None
     while state is None or not state.is_finished:
@@ -118,10 +127,11 @@ def main(num_digits: int, num_guesses: int, use_answer: Optional[str],
         state = game.step(guess, state)
         if handle_result:
             handle_result(state)
-        if not state.is_finished:
+        if not state.is_finished and not quiet:
             print(f'Guesses Remaining: {state.guesses_remaining} Result: {info_to_str(state.information[-1])}')
-    print(f'Winner! The answer was {info_to_str(state.information[-1])}.'
-          if state.is_winner else f'Sorry! The answer was {game._answer}. Try Again!')
+    if not quiet:
+        print(f'Winner! The answer was {info_to_str(state.information[-1])}.'
+            if state.is_winner else f'Sorry! The answer was {game._answer}. Try Again!')
 
 if __name__ == '__main__':
     import argparse
