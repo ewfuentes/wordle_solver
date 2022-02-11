@@ -4,6 +4,7 @@ import wordle
 import wordle_solver
 import words
 import tqdm
+import argparse
 
 def run_game(answer: str):
     solver = None
@@ -35,7 +36,7 @@ def run_game(answer: str):
                 quiet=True)
     return final_state
 
-def main():
+def main(filename: str):
     all_words = words.valid_guesses + words.possible_answers
     final_states = []
     for word in tqdm.tqdm(all_words):
@@ -43,9 +44,12 @@ def main():
             final_states.append(run_game(word))
         except:
             break
-    with open('result.p', 'wb') as file_out:
+    with open(filename, 'wb') as file_out:
         import pickle
         pickle.dump(final_states, file_out)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output')
+    args = parser.parse_args()
+    main(args.output)
