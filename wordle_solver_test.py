@@ -35,6 +35,17 @@ class WordleSolverTest(unittest.TestCase):
         self.assertEqual(len(valid_answers), 1)
         self.assertEqual(valid_answers[0], '76')
 
+    def test_filter_answer_in_word_repeated(self):
+        answer_list = ['bundh', 'bundu']
+        guess = 'zulus'
+        cat = [wordle.Info.WRONG, wordle.Info.RIGHT, wordle.Info.WRONG, wordle.Info.IN_WORD, wordle.Info.WRONG]
+        info = [wordle.CharInfo(char, info) for char, info in zip(guess, cat)]
+
+        valid_answers = wordle_solver.filter_answer_list(info, answer_list)
+
+        self.assertEqual(len(valid_answers), 1)
+        self.assertEqual(valid_answers[0], 'bundu')
+
     def test_best_guess_single_answer(self):
         guess_list = [str(x).zfill(2) for x in range(100)]
         answer_list = ['78']

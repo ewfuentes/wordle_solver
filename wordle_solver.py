@@ -14,24 +14,49 @@ class Guess(NamedTuple):
     guess: str
     score: float
 
+def matches_info(info: List[CharInfo], answer: str) -> bool:
+    assert len(info) == len(answer)
+    letter_counts: Dict[str, int] = {}
+    right_counts: Dict[str, int] = {}
+    for i, char_info in enumerate(info):
+        if char_info.info == Info.RIGHT and answer[i] == char_info.char:
+            right_counts[char_info.char] = right_counts.get(char_info.char, 0) + 1
+        letter_counts[char_info.char] = 0
+        for answer_char in answer:
+            if answer_char == char_info.char:
+                letter_counts[char_info.char] += 1
+
+    unaccounted_counts = {char: letter_counts[char] - right_counts.get(char, 0) for char in letter_counts}
+
+    for i, char_info in enumerate(info):
+        if char_info.info == Info.RIGHT and char_info.char != answer[i]:
+            return False
+        elif char_info.info == Info.IN_WORD:
+            if char_info.char == answer[i]:
+                return False
+
+            char_in_word = letter_counts[char_info.char] > 0
+            if char_in_word and unaccounted_counts[char_info.char] > 0:
+                unaccounted_counts[char_info.char] -= 1
+            elif char_in_word and unaccounted_counts[char_info.char] == 0:
+                return False
+            elif not char_in_word:
+                return False
+
+        elif char_info.info == Info.WRONG:
+            if char_info.char == answer[i]:
+                return False
+            char_in_word = letter_counts[char_info.char] > 0
+            if char_in_word and unaccounted_counts[char_info.char] > 0:
+                return False
+
+    return True
+
+
 def filter_answer_list(info: List[CharInfo], answer_list: List[str]):
     options = list(answer_list)
-    for i, char_info in enumerate(info):
-        if char_info.info == Info.WRONG:
-            # If this letter does not exist in word, remove all words with this letter
-            options = [x for x in options if char_info.char not in x]
-        elif char_info.info == Info.IN_WORD:
-            # This this letter exists in the word, remove all words that don't have this letter,
-            # or have this letter in this position
-            options = [x for x in options if x[i] != char_info.char]
-            options = [x for x in options if char_info.char in x]
-        elif char_info.info == Info.RIGHT:
-            # This letter is in the correct position, remove all words that don't have this
-            # in this position
-            options = [x for x in options if x[i] == char_info.char]
-        else:
-            assert False, f'Unknown Info type: {char_info.info} at index {i}'
-    return options
+
+    return list(filter(lambda x: matches_info(info, x), options))
 
 def compute_entropy(guess: str, answer_list: List[str]):
     # each character in guess can either:
