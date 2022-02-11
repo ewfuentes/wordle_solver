@@ -3,6 +3,7 @@ import unittest
 
 import wordle_solver
 import compute_entropy_python as cep
+import math
 
 class ComputeEntropyPythonTest(unittest.TestCase):
     def test_compute_entropy_happy_case(self):
@@ -53,6 +54,24 @@ class ComputeEntropyPythonTest(unittest.TestCase):
                                   and categories[2] == cep.Category.WRONG
                                 else 0)
                 self.assertEqual(count, expected_count)
+
+    def test_basic_entropy_1(self):
+        answer_list = ['111', '222', '333']
+        guess = '123'
+        expected_entropy = -math.log2(1/3)
+
+        entropy = cep.compute_entropy(guess, answer_list)
+
+        self.assertAlmostEqual(entropy, expected_entropy, places=6)
+
+    def test_basic_entropy_2(self):
+        answer_list = ['111', '112', '113']
+        guess = '111'
+        expected_entropy = -(1/3*math.log2(1/3) + 2/3 * math.log2(2/3))
+
+        entropy = cep.compute_entropy(guess, answer_list)
+
+        self.assertAlmostEqual(entropy, expected_entropy, places=6)
 
 
 if __name__ == "__main__":

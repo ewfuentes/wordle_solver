@@ -2,6 +2,9 @@ import unittest
 
 import wordle_solver
 import wordle
+import compute_entropy_python as cep
+
+import words
 
 class WordleSolverTest(unittest.TestCase):
     def test_filter_answer_list_right_answer(self):
@@ -68,6 +71,14 @@ class WordleSolverTest(unittest.TestCase):
             else:
                 self.assertGreater(score, score_from_guess['00'])
                 self.assertEqual(score, score_from_guess['01'])
+
+class WordleSolverPerformanceTest(unittest.TestCase):
+    def test_1(self):
+        answer_list = ['babes', 'faxes', 'gages']
+        guess_list = ['zaxes', 'galax']
+
+        self.assertGreater(cep.compute_entropy('galax', answer_list), cep.compute_entropy('zaxes', answer_list))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -25,7 +25,7 @@ test: test_wordle test_wordle_solver test_compute_entropy_python
 test_wordle:
 	python3 wordle_test.py
 
-test_wordle_solver:
+test_wordle_solver: $(PYTHON_LIBRARY_NAME)
 	python3 wordle_solver_test.py
 
 test_compute_entropy_python: all

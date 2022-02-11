@@ -190,7 +190,7 @@ double compute_entropy(const std::string &guess,
   }
   start_idx += 8;
 
-  for (int idx = start_idx; start_idx < counts.size(); start_idx++) {
+  for (int idx = start_idx; idx < counts.size(); idx++) {
     if (counts[idx] > 0) {
       const float probability =
           static_cast<float>(counts[idx]) / answers.size();
