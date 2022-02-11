@@ -116,6 +116,23 @@ class WordleSolver:
     def handle_information(self, info: List[CharInfo]):
         self._possible_answers = filter_answer_list(info, self._possible_answers)
 
+class FixedWordleSolver:
+    def __init__(self, filename: str):
+        with open(filename, 'rb') as file_in:
+            import pickle
+            self._root = pickle.load(file_in)
+            self._curr = self._root
+
+    def handle_information(self, info: List[CharInfo]):
+        only_infos = tuple([x.info for x in info])
+        self._curr = self._curr.options[only_infos]
+
+    def compute_ranked_guesses(self) -> List[Guess]:
+        return [Guess(guess=self._curr.guess, score=0.0)]
+
+    def reset(self):
+        self._curr = self._root
+
 
 if __name__ == "__main__":
     import argparse
