@@ -8,6 +8,7 @@ import itertools
 import compute_entropy_python as cep
 import copy
 from typing import NamedTuple, Dict, Optional, List
+import argparse
 
 class GameNode(NamedTuple):
     guess: str
@@ -32,15 +33,17 @@ def dump_tree(solver: wordle_solver.WordleSolver, depth=0, category=None) -> Opt
     except Exception as e:
         return None
 
-def main():
+def main(output_path: str):
     all_words = words.possible_answers + words.valid_guesses
     solver = wordle_solver.WordleSolver(all_words, all_words, quiet=True)
     game_tree = dump_tree(solver)
-    with open('tree.p', 'wb') as file_out:
+    with open(output_path, 'wb') as file_out:
         import pickle
         pickle.dump(game_tree, file_out)
 
 
-
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output', type=str)
+    args = parser.parse_args()
+    main(args.output)
