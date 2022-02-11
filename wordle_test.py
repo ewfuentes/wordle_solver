@@ -40,7 +40,7 @@ class ComputeInformationTest(unittest.TestCase):
     def test_compute_info_repeated(self):
         GUESS = '222'
         ANSWER = '122'
-        EXPECTED_INFO = [Info.IN_WORD, Info.RIGHT, Info.RIGHT]
+        EXPECTED_INFO = [Info.WRONG, Info.RIGHT, Info.RIGHT]
         is_winner, info = compute_information(GUESS, ANSWER)
         self.assertFalse(is_winner)
         self.assertEqual(len(info), len(GUESS))

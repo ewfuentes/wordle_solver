@@ -24,11 +24,20 @@ def compute_information(guess: str, answer: str) -> Tuple[bool, List[CharInfo]]:
     assert len(guess) == len(answer), f'guess must be of length {len(answer)}'
     out = []
     is_winner = True
+    letter_counts: Dict[str, int] = {}
+    right_counts: Dict[str, int] = {}
+    for i, char in enumerate(answer):
+        letter_counts[char] = letter_counts.get(char, 0) + 1
+        if char == guess[i]:
+            right_counts[char] = right_counts.get(char, 0) + 1
+    unaccounted_counts = {char: letter_counts[char] - right_counts.get(char, 0) for char in letter_counts}
+
     for i, char in enumerate(guess):
         if answer[i] == char:
             out.append(CharInfo(char, Info.RIGHT))
-        elif char in answer:
+        elif char in answer and unaccounted_counts[char] > 0:
             out.append(CharInfo(char, Info.IN_WORD))
+            unaccounted_counts[char] -= 1
             is_winner = False
         else:
             out.append(CharInfo(char, Info.WRONG))
